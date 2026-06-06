@@ -1,0 +1,8 @@
+{
+    "name": "EventCalendar",
+    "slug": "eventcalendar",
+    "version": "1.0.0",
+    "author": "Nexpell",
+    "description": "Event and calendar management",
+    "api_version": 1
+}

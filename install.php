@@ -1,5 +1,21 @@
 <?php
-global $_database;
+if (!function_exists('safe_query')) {
+    die('Access denied');
+}
+
+global $_database, $plugin;
+
+$modulname = 'eventcalendar';
+$version = isset($plugin['version']) ? (string)$plugin['version'] : ($version ?? '1.0.0');
+$pluginName = 'EventCalendar';
+$pluginPath = 'includes/plugins/eventcalendar/';
+
+if (!function_exists('eventcalendar_sql')) {
+    function eventcalendar_sql($value): string
+    {
+        return escape((string)$value);
+    }
+}
 
 require_once __DIR__ . '/eventcalendar-functions.php';
 eventcalendar_ensure_schema($_database);
@@ -12,18 +28,37 @@ VALUES
     (3, 'Clanwar Training Match', 'clanwar', DATE_ADD(CURDATE(), INTERVAL 28 DAY) + INTERVAL 20 HOUR, NULL, 'NX Rivals', 'Online', 'Best of 3 Vorbereitungsspiel.', 0, 'scheduled', 30),
     (4, 'Sponsorengespraech', 'business', DATE_ADD(CURDATE(), INTERVAL 35 DAY) + INTERVAL 17 HOUR, NULL, '', 'Vereinsheim', 'Termin mit lokalen Partnern.', 0, 'scheduled', 40)");
 
-safe_query("
-    INSERT IGNORE INTO settings_plugins
-        (pluginID, modulname, admin_file, activate, author, website, index_link, hiddenfiles, version, path, status_display, plugin_display, widget_display, delete_display, sidebar)
+$pluginRes = safe_query("SELECT pluginID FROM settings_plugins WHERE modulname = 'eventcalendar' LIMIT 1");
+if ($pluginRes && ($pluginRow = mysqli_fetch_assoc($pluginRes))) {
+    safe_query("UPDATE settings_plugins SET
+        admin_file = 'admin_eventcalendar',
+        activate = 1,
+        author = 'T-Seven',
+        website = 'https://www.nexpell.de',
+        index_link = 'eventcalendar',
+        hiddenfiles = '',
+        version = '" . eventcalendar_sql($version) . "',
+        path = '" . eventcalendar_sql($pluginPath) . "',
+        status_display = 1,
+        plugin_display = 1,
+        widget_display = 1,
+        delete_display = 1,
+        sidebar = 'deactivated'
+        WHERE pluginID = " . (int)$pluginRow['pluginID'] . "
+    ");
+} else {
+    safe_query("INSERT INTO settings_plugins
+        (modulname, admin_file, activate, author, website, index_link, hiddenfiles, version, path, status_display, plugin_display, widget_display, delete_display, sidebar)
     VALUES
-        ('', 'eventcalendar', 'admin_eventcalendar', 1, 'T-Seven', 'https://www.nexpell.de', 'eventcalendar', '', '1.0.0', 'includes/plugins/eventcalendar/', 1, 1, 1, 1, 'deactivated')
-");
+        ('eventcalendar', 'admin_eventcalendar', 1, 'T-Seven', 'https://www.nexpell.de', 'eventcalendar', '', '" . eventcalendar_sql($version) . "', '" . eventcalendar_sql($pluginPath) . "', 1, 1, 1, 1, 'deactivated')
+    ");
+}
 
 safe_query("
     INSERT INTO settings_widgets
         (widget_key, title, modulname, plugin, description, allowed_zones, active, version, created_at)
     VALUES
-        ('widget_eventcalendar_content', 'Eventkalender Spielplan Widget', 'eventcalendar', 'eventcalendar', 'Grosses Spielplan-Widget fuer Veranstaltungen, Turniere, Clanwars und Termine.', 'maintop,mainbottom', 1, '1.0.0', NOW())
+        ('widget_eventcalendar_content', 'Eventkalender Spielplan Widget', 'eventcalendar', 'eventcalendar', 'Grosses Spielplan-Widget fuer Veranstaltungen, Turniere, Clanwars und Termine.', 'maintop,mainbottom', 1, '" . eventcalendar_sql($version) . "', NOW())
     ON DUPLICATE KEY UPDATE
         title = VALUES(title),
         modulname = VALUES(modulname),
@@ -54,7 +89,7 @@ safe_query("
     INSERT IGNORE INTO settings_plugins_installed
         (name, modulname, description, version, author, url, folder, installed_date)
     VALUES
-        ('Eventkalender', 'eventcalendar', 'Kalender fuer Veranstaltungen, Turniere, Clanwars und Businesstermine.', '1.0.0', 'nexpell-team', 'https://www.nexpell.de', 'eventcalendar', NOW())
+        ('Eventkalender', 'eventcalendar', 'Kalender fuer Veranstaltungen, Turniere, Clanwars und Businesstermine.', '" . eventcalendar_sql($version) . "', 'nexpell-team', 'https://www.nexpell.de', 'eventcalendar', NOW())
     ON DUPLICATE KEY UPDATE
         name = VALUES(name),
         description = VALUES(description),
@@ -68,14 +103,21 @@ safe_query("
 $linkID = 0;
 $linkRes = safe_query("
     SELECT linkID FROM navigation_dashboard_links
-    WHERE modulname = 'eventcalendar' AND url = 'admincenter.php?site=admin_eventcalendar'
+    WHERE modulname = 'eventcalendar'
     ORDER BY linkID ASC LIMIT 1
 ");
 if ($linkRes && ($linkRow = mysqli_fetch_assoc($linkRes))) {
     $linkID = (int)($linkRow['linkID'] ?? 0);
+    safe_query("
+        UPDATE navigation_dashboard_links SET
+            catID = 8,
+            url = 'admincenter.php?site=admin_eventcalendar',
+            sort = 1
+        WHERE linkID = " . $linkID . "
+    ");
 } else {
     safe_query("
-        INSERT IGNORE INTO navigation_dashboard_links
+        INSERT INTO navigation_dashboard_links
             (catID, modulname, url, sort)
         VALUES
             (8, 'eventcalendar', 'admincenter.php?site=admin_eventcalendar', 1)
@@ -85,7 +127,7 @@ if ($linkRes && ($linkRow = mysqli_fetch_assoc($linkRes))) {
 
 if ($linkID > 0) {
     safe_query("
-        INSERT IGNORE INTO navigation_dashboard_lang
+        INSERT INTO navigation_dashboard_lang
             (content_key, language, content, modulname, updated_at)
         VALUES
             ('nav_link_{$linkID}', 'de', 'Eventkalender', 'eventcalendar', NOW()),
@@ -101,14 +143,23 @@ if ($linkID > 0) {
 $snavID = 0;
 $snavRes = safe_query("
     SELECT snavID FROM navigation_website_sub
-    WHERE modulname = 'eventcalendar' AND url = 'index.php?site=eventcalendar'
+    WHERE modulname = 'eventcalendar'
     ORDER BY snavID ASC LIMIT 1
 ");
 if ($snavRes && ($snavRow = mysqli_fetch_assoc($snavRes))) {
     $snavID = (int)($snavRow['snavID'] ?? 0);
+    safe_query("
+        UPDATE navigation_website_sub SET
+            mnavID = 1,
+            url = 'index.php?site=eventcalendar',
+            sort = 1,
+            indropdown = 1,
+            last_modified = NOW()
+        WHERE snavID = " . $snavID . "
+    ");
 } else {
     safe_query("
-        INSERT IGNORE INTO navigation_website_sub
+        INSERT INTO navigation_website_sub
             (mnavID, modulname, url, sort, indropdown, last_modified)
         VALUES
             (1, 'eventcalendar', 'index.php?site=eventcalendar', 1, 1, NOW())
@@ -118,7 +169,7 @@ if ($snavRes && ($snavRow = mysqli_fetch_assoc($snavRes))) {
 
 if ($snavID > 0) {
     safe_query("
-        INSERT IGNORE INTO navigation_website_lang
+        INSERT INTO navigation_website_lang
             (content_key, language, content, modulname, updated_at)
         VALUES
             ('nav_sub_{$snavID}', 'de', 'Termine', 'eventcalendar', NOW()),
@@ -133,4 +184,3 @@ if ($snavID > 0) {
 
 safe_query("INSERT IGNORE INTO user_role_admin_navi_rights (id, roleID, type, modulname)
 VALUES ('', 1, 'link', 'eventcalendar')");
-?>

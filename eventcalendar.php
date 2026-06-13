@@ -181,7 +181,7 @@ $action = eventcalendar_route_action();
           <div class="eventcalendar-detail__notes"><?= nl2br(eventcalendar_h((string)$event['notes'])) ?></div>
         <?php endif; ?>
         <?php if ($externalUrl !== ''): ?>
-          <a class="eventcalendar-list-link" href="<?= eventcalendar_h($externalUrl) ?>">Weiterfuehrender Link</a>
+          <a class="eventcalendar-list-link" href="<?= eventcalendar_h($externalUrl) ?>">Weiterführender Link</a>
         <?php endif; ?>
       </article>
     <?php endif; ?>

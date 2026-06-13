@@ -273,7 +273,7 @@ $startTs = strtotime((string)$formEvent['starts_at']) ?: time();
                       <a class="btn btn-warning btn-sm d-inline-flex align-items-center gap-1 w-auto" href="<?= eventcalendar_h(eventcalendar_admin_url('edit', (int)$event['id'])) ?>">
                         <i class="bi bi-pencil-square"></i> &Auml;ndern
                       </a>
-                      <form method="post" class="d-inline" onsubmit="return confirm('Termin wirklich loeschen?');">
+                      <form method="post" class="d-inline" onsubmit="return confirm('Termin wirklich löschen?');">
                         <input type="hidden" name="csrf_token" value="<?= eventcalendar_h((string)$_SESSION['csrf_token']) ?>">
                         <input type="hidden" name="delete_event" value="1">
                         <input type="hidden" name="id" value="<?= (int)$event['id'] ?>">
